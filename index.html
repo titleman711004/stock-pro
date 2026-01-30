@@ -34,12 +34,12 @@
         body { background-color: var(--bg-body); color: var(--text-main); font-family: -apple-system, sans-serif; transition: all 0.3s; }
         .input-card { background: var(--bg-card); border-radius: 12px; padding: 16px; border: 2px solid var(--border-color); margin-bottom: 20px; transition: all 0.3s; }
         .input-field { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; color: var(--input-text) !important; font-size: 16px !important; width: 100%; }
-        /* 優化後的列表行樣式：增加內距與對齊控制 */
-        .compact-row { background: var(--row-bg); border: 1px solid var(--row-border); margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; padding: 12px; min-height: 68px; }
-        .drag-handle { cursor: move; color: #3b82f6; width: 24px; display: none; align-items: center; justify-content: center; font-size: 18px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 8px; flex-shrink: 0; }
+        /* 優化後的列表行：減少左右 padding 以爭取空間 */
+        .compact-row { background: var(--row-bg); border: 1px solid var(--row-border); margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; padding: 10px 8px; min-height: 68px; }
+        .drag-handle { cursor: move; color: #3b82f6; width: 24px; display: none; align-items: center; justify-content: center; font-size: 18px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 6px; flex-shrink: 0; }
         body.is-sorting .drag-handle { display: flex; }
-        /* 按鈕樣式微調 */
-        .num-dot { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+        /* 按鈕樣式：縮小尺寸至 24px 以避免擠壓文字 */
+        .num-dot { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
         .chart-box { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 12px; position: relative; }
         .master-chart-box { border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.15); }
         .chart-container { height: 350px; position: relative; }
@@ -219,21 +219,19 @@
                     const tCost = (item.avgPrice * item.shares * 1000) - (item.divRec || 0) - (item.gainRec || 0);
                     const perCost = item.shares > 0 ? (tCost / (item.shares * 1000)).toFixed(2) : 0;
                     
-                    // ★ 這裡進行了大幅修改，解決了重疊問題 ★
+                    // ★ 關鍵修復：這裡加上了 overflow-hidden 和 truncate ★
                     body.innerHTML += `
                     <div class="compact-row" data-id="${item.id}">
                         <div class="drag-handle">☰</div>
                         <div class="w-1.5 h-10 rounded-full flex-shrink-0 mr-2" style="background:${stockColor}"></div>
                         
-                        <div class="flex-1 flex flex-col justify-center min-w-0 mr-2">
-                            <div class="font-bold text-sm text-white truncate mb-1">${item.symbol}</div>
-                            
+                        <div class="flex-1 flex flex-col justify-center min-w-0 mr-1 overflow-hidden">
+                            <div class="font-bold text-sm text-white truncate mb-0.5">${item.symbol}</div>
                             <div class="flex items-center text-[11px] leading-none">
                                 <span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded mr-2 flex-shrink-0 border border-slate-700">${item.shares} 張</span>
-                                <span class="text-emerald-400 font-mono whitespace-nowrap">成本: ${perCost}</span>
+                                <span class="text-emerald-400 font-mono truncate">成本: ${perCost}</span>
                             </div>
-                            
-                            ${item.note ? `<div class="text-[10px] text-yellow-500/80 mt-1 italic truncate">${item.note}</div>` : ''}
+                            ${item.note ? `<div class="text-[10px] text-yellow-500/80 mt-0.5 italic truncate">${item.note}</div>` : ''}
                         </div>
 
                         <div class="flex gap-0.5 flex-shrink-0">${btns}</div>
