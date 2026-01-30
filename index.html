@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stock Dashboard Pro - Integrated</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        :root {
+            --bg-body: #0f172a; --bg-card: #1e293b; --bg-input: #334155; 
+            --border-color: #334155; --text-main: #ffffff; --text-sub: #94a3b8;
+            --chart-border: #0f172a; --input-text: #ffffff; --row-bg: #111827;
+            --row-border: #1f2937; --tech-line: #06b6d4; --tech-text-pct: #06b6d4;
+            --btn-bg: #1e293b; --btn-text: #94a3b8;
+        }
+        [data-theme="ocean"] {
+            --bg-body: #0a1929; --bg-card: #132f4c; --bg-input: #1e4976;
+            --border-color: #2a6496; --text-main: #e2e8f0; --text-sub: #94a3b8;
+            --chart-border: #0a1929; --input-text: #ffffff; --row-bg: #0d2137;
+            --row-border: #132f4c; --tech-line: #38bdf8; --tech-text-pct: #38bdf8;
+            --btn-bg: #132f4c; --btn-text: #94a3b8;
+        }
+        [data-theme="oled"] {
+            --bg-body: #000000; --bg-card: #121212; --bg-input: #262626;
+            --border-color: #333333; --text-main: #e5e5e5; --text-sub: #a3a3a3;
+            --chart-border: #000000; --input-text: #e5e5e5; --row-bg: #0a0a0a;
+            --row-border: #262626; --tech-line: #22d3ee; --tech-text-pct: #22d3ee;
+            --btn-bg: #171717; --btn-text: #a3a3a3;
+        }
+
+        body { background-color: var(--bg-body); color: var(--text-main); font-family: -apple-system, sans-serif; transition: all 0.3s; }
+        .input-card { background: var(--bg-card); border-radius: 12px; padding: 16px; border: 2px solid var(--border-color); margin-bottom: 20px; transition: all 0.3s; }
+        .input-field { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; color: var(--input-text) !important; font-size: 16px !important; width: 100%; }
+        .compact-row { background: var(--row-bg); border: 1px solid var(--row-border); margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; padding: 14px; min-height: 60px; }
+        
+        .drag-handle { cursor: move; color: #3b82f6; width: 40px; display: none; align-items: center; justify-content: center; font-size: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 12px; }
+        body.is-sorting .drag-handle { display: flex; }
+        
+        .num-dot { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid transparent; }
+        .chart-box { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 12px; position: relative; }
+        .master-chart-box { border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.15); }
+        .chart-container { height: 400px; position: relative; }
+        .master-container { height: 480px; position: relative; }
+
+        .note-legend { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 13px; color: var(--text-sub); text-align: center; line-height: 1.6; }
+        .screenshot-hide { opacity: 1; transition: opacity 0.2s; }
+        .capturing .screenshot-hide { opacity: 0 !important; visibility: hidden !important; }
+
+        .edit-only { display: none; }
+        body.is-editing .edit-only { display: block; }
+        body.is-editing .edit-only-flex { display: flex; }
+        .edit-only-flex { display: none; }
+
+        .btn-icon { background: var(--btn-bg); color: var(--btn-text); border: 1px solid var(--border-color); }
+        #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: none; justify-content: center; align-items: center; flex-direction: column; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="p-3">
+
+    <div id="loadingOverlay"><div class="spinner"></div><div class="text-blue-400 font-bold tracking-widest">高清渲染中...</div></div>
+
+    <div class="max-w-7xl mx-auto">
+        <header class="flex flex-col md:flex-row items-center justify-between mb-6 gap-y-4">
+            <div class="flex flex-col items-center md:items-start w-full md:w-auto">
+                <div class="flex items-center">
+                    <h2 class="text-2xl font-black text-blue-500 italic text-center">DASHBOARD <span class="text-xs text-yellow-400 not-italic ml-1" style="text-shadow: 0 0 10px #facc15, 0 0 20px #854d0e;">PRO</span></h2>
+                </div>
+                <div class="flex items-center gap-3 mt-1">
+                    <button onclick="cycleTheme()" class="text-xs px-2 py-0.5 rounded border border-slate-600 bg-slate-800 text-slate-300 hover:text-white transition-all whitespace-nowrap">🎨 <span id="themeName">預設</span></button>
+                    <button id="editBtn" onclick="toggleEditMode()" class="text-xs px-2 py-0.5 rounded border border-blue-600 bg-blue-900/30 text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all">✎ 編輯模式：OFF</button>
+                </div>
+            </div>
+            
+            <div class="flex gap-3 justify-end w-full md:w-auto edit-only-flex">
+                <button onclick="addNewChart()" class="bg-blue-600 text-white text-[10px] px-4 py-2 rounded-lg font-bold shadow-lg hover:scale-105 transition">+ 分組</button>
+                <button onclick="copyToClipboard()" class="bg-emerald-700 text-white text-[10px] px-4 py-2 rounded-lg font-bold shadow-lg hover:scale-105 transition">備份</button>
+                <button onclick="importFromText()" class="bg-slate-700 text-white text-[10px] px-4 py-2 rounded-lg font-bold shadow-lg hover:scale-105 transition">還原</button>
+            </div>
+        </header>
+
+        <div id="masterChartWrapper" class="mb-8 hidden">
+            <div class="chart-box master-chart-box" id="masterChartBox">
+                <h3 class="text-center text-blue-400 font-bold text-xl mb-1 tracking-widest">資產配置總覽</h3>
+                <div class="text-center text-slate-500 text-xs mb-2 font-mono tracking-wider">總資產：<span id="grandTotal" class="text-emerald-400 font-black text-2xl">0</span> 萬</div>
+                <button onclick="toggleMasterLabelPos()" class="screenshot-hide absolute top-3 right-12 btn-icon rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg edit-only">◐</button>
+                <button onclick="downloadMasterChart()" class="screenshot-hide absolute top-3 right-3 btn-icon rounded-full w-8 h-8 flex items-center justify-center">📷</button>
+                <div class="master-container"><canvas id="masterCanvas"></canvas></div>
+            </div>
+        </div>
+
+        <div id="chartsWrapper" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"></div>
+
+        <div id="inputArea" class="input-card shadow-2xl edit-only">
+            <input type="hidden" id="editId" value="">
+            <div class="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
+                <div class="col-span-1"><label class="text-[10px] text-slate-400 mb-1 block">股票代號</label><input id="symbol" class="input-field"></div>
+                <div class="col-span-1"><label class="text-[10px] text-blue-400 mb-1 block">文字大小</label><input type="number" id="fontSize" class="input-field" value="12"></div>
+                <div class="col-span-1"><label class="text-[10px] text-slate-400 mb-1 block">張數</label><input type="number" id="shares" class="input-field" step="0.001"></div>
+                <div class="col-span-1"><label class="text-[10px] text-slate-400 mb-1 block">均價</label><input type="number" id="avgPrice" class="input-field"></div>
+                <div class="col-span-1"><label class="text-[10px] text-emerald-400 mb-1 block">領息</label><input type="number" id="divRec" value="0" class="input-field"></div>
+                <div class="col-span-1"><label class="text-[10px] text-orange-400 mb-1 block">獲利</label><input type="number" id="gainRec" value="0" class="input-field"></div>
+                <div class="col-span-2 md:col-span-7"><label class="text-[10px] text-yellow-500 mb-1 block">備註</label><input id="note" class="input-field"></div>
+            </div>
+            <button onclick="saveStock()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xl active:scale-95 transition-all">儲存並刷新</button>
+        </div>
+
+        <div class="edit-only">
+            <div class="flex justify-between items-center mb-2 px-1">
+                <span class="text-sm font-bold text-slate-500 uppercase tracking-widest">資產列表詳情</span>
+                <button id="sortToggle" onclick="toggleSortMode()" class="text-xs bg-slate-800 border border-slate-600 px-5 py-2 rounded-full text-blue-400 font-bold transition-all">⇅ 排序模式</button>
+            </div>
+            <div id="groupTabs" class="flex gap-2 overflow-x-auto pb-4 no-scrollbar"></div>
+            <div id="mainTable" class="space-y-2 pb-24"></div>
+        </div>
+    </div>
+    <footer class="text-center text-slate-600 text-[10px] mt-8 py-6 border-t border-slate-800 tracking-wider">Copyright © Titleman</footer>
+
+    <script>
+        let isEditing = localStorage.getItem('isEditingMode') === 'true';
+        let isSortMode = false;
+        let myAssets = JSON.parse(localStorage.getItem('myAssetsV107') || '[]');
+        let chartConfigs = JSON.parse(localStorage.getItem('chartConfigsV108') || '[{"id":1,"title":"主要配置","selectedIds":[],"labelPos":"outside"}]');
+        let currentTheme = localStorage.getItem('appThemeV1') || 'dark';
+        let masterLabelPos = localStorage.getItem('masterLabelPosV1') || 'outside';
+        let currentFilterGroup = -1;
+        let chartInstances = {}, masterChartInstance = null, sortable = null;
+
+        const uniquePalette = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#fbbf24', '#6366f1', '#d946ef', '#2dd4bf', '#f43f5e', '#a855f7', '#34d399', '#fb7185', '#60a5fa', '#fb923c', '#818cf8'];
+        function getItemColor(index) { return uniquePalette[index % uniquePalette.length]; }
+        function getThemeColor(varName) { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
+
+        function toggleEditMode() {
+            isEditing = !isEditing;
+            if (!isEditing) isSortMode = false; // 關閉編輯時強制關閉排序
+            localStorage.setItem('isEditingMode', isEditing);
+            updateEditUI();
+            render();
+        }
+
+        function toggleSortMode() {
+            isSortMode = !isSortMode;
+            const btn = document.getElementById('sortToggle');
+            if (isSortMode) {
+                document.body.classList.add('is-sorting');
+                btn.innerText = "✓ 鎖定順序";
+                btn.classList.add('bg-blue-600', 'text-white');
+            } else {
+                document.body.classList.remove('is-sorting');
+                btn.innerText = "⇅ 排序模式";
+                btn.classList.remove('bg-blue-600', 'text-white');
+                if (sortable) { sortable.destroy(); sortable = null; }
+            }
+            render();
+        }
+
+        function updateEditUI() {
+            const btn = document.getElementById('editBtn');
+            if (isEditing) {
+                document.body.classList.add('is-editing');
+                btn.innerText = '✎ 編輯模式：ON';
+                btn.classList.add('text-yellow-400');
+            } else {
+                document.body.classList.remove('is-editing', 'is-sorting');
+                btn.innerText = '✎ 編輯模式：OFF';
+                btn.classList.remove('text-yellow-400');
+            }
+        }
+
+        function initSortable() {
+            const el = document.getElementById('mainTable');
+            if (!el || !isSortMode) return;
+            if (sortable) sortable.destroy();
+            sortable = Sortable.create(el, {
+                handle: '.drag-handle', animation: 200,
+                onEnd: () => {
+                    const rows = Array.from(el.querySelectorAll('.compact-row'));
+                    const newIds = rows.map(r => parseInt(r.dataset.id));
+                    myAssets = newIds.map(id => myAssets.find(a => a.id === id));
+                    localStorage.setItem('myAssetsV107', JSON.stringify(myAssets));
+                    render();
+                }
+            });
+        }
+
+        const techLabelsPlugin = {
+            id: 'techLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                const lineColor = getThemeColor('--tech-line');
+                const pctColor = getThemeColor('--tech-text-pct');
+                const textColor = getThemeColor('--text-main');
+                const isMobile = window.innerWidth < 480;
+                let labels = [];
+                chart.data.datasets.forEach((dataset, i) => {
+                    chart.getDatasetMeta(i).data.forEach((datapoint, index) => {
+                        const model = datapoint; const angle = (model.startAngle + model.endAngle) / 2;
+                        const isRight = angle < Math.PI / 2 || angle > Math.PI * 1.5;
+                        const outerRadius = model.outerRadius; const lineExtendLen = isMobile ? 10 : 30;
+                        labels.push({ index, isRight, startX: model.x + Math.cos(angle) * outerRadius, startY: model.y + Math.sin(angle) * outerRadius, elbowX: model.x + Math.cos(angle) * (outerRadius + lineExtendLen), elbowY: model.y + Math.sin(angle) * (outerRadius + lineExtendLen), text: chart.data.labels[index], pct: ((dataset.data[index] / dataset.data.reduce((a,b)=>a+b,0)) * 100).toFixed(1) + '%', finalY: model.y + Math.sin(angle) * (outerRadius + lineExtendLen) });
+                    });
+                });
+                ['left', 'right'].forEach(side => {
+                    const sideLabels = labels.filter(l => l.isRight === (side === 'right')).sort((a, b) => a.finalY - b.finalY);
+                    if (sideLabels.length === 0) return;
+                    const minSpacing = isMobile ? 40 : 55;
+                    for (let i = 1; i < sideLabels.length; i++) { if (sideLabels[i].finalY - sideLabels[i-1].finalY < minSpacing) sideLabels[i].finalY = sideLabels[i-1].finalY + minSpacing; }
+                });
+                labels.forEach(l => {
+                    const lineBendLen = isMobile ? 10 : 40; const endX = l.elbowX + (l.isRight ? lineBendLen : -lineBendLen);
+                    ctx.save(); ctx.beginPath(); ctx.moveTo(l.startX, l.startY); ctx.lineTo(l.elbowX, l.elbowY); ctx.lineTo(l.elbowX, l.finalY); ctx.lineTo(endX, l.finalY);
+                    ctx.strokeStyle = lineColor; ctx.lineWidth = 1.5; ctx.stroke(); ctx.font = isMobile ? 'bold 10px sans-serif' : 'bold 13px sans-serif'; ctx.fillStyle = textColor; ctx.textAlign = l.isRight ? 'left' : 'right';
+                    ctx.fillText(l.text, endX + (l.isRight ? 8 : -8), l.finalY - 8); ctx.fillStyle = pctColor; ctx.fillText(l.pct, endX + (l.isRight ? 8 : -8), l.finalY + 8); ctx.restore();
+                });
+            }
+        };
+
+        function render() {
+            localStorage.setItem('myAssetsV107', JSON.stringify(myAssets));
+            localStorage.setItem('chartConfigsV108', JSON.stringify(chartConfigs));
+            const textColor = getThemeColor('--text-main');
+
+            // 1. Master Chart
+            let grandTotal = 0; const mLabels = [], mData = [], mColors = [];
+            chartConfigs.forEach((conf, i) => {
+                let groupTotal = 0;
+                conf.selectedIds.forEach(sid => { const s = myAssets.find(a => a.id == sid); if(s) groupTotal += Math.max(0, (s.avgPrice*s.shares*1000)-(s.divRec||0)-(s.gainRec||0)); });
+                if(groupTotal > 0) { mLabels.push(conf.title); mData.push(groupTotal); mColors.push(getItemColor(i)); grandTotal += groupTotal; }
+            });
+            document.getElementById('grandTotal').innerText = (grandTotal / 10000).toFixed(1);
+            if(grandTotal > 0) {
+                document.getElementById('masterChartWrapper').classList.remove('hidden');
+                const ctxM = document.getElementById('masterCanvas').getContext('2d');
+                if (masterChartInstance) masterChartInstance.destroy();
+                masterChartInstance = new Chart(ctxM, {
+                    type: 'pie', data: { labels: mLabels, datasets: [{ data: mData, backgroundColor: mColors, borderWidth: 2, borderColor: getThemeColor('--chart-border') }]},
+                    options: { devicePixelRatio: 3, responsive: true, maintainAspectRatio: false, layout: { padding: 50 }, plugins: { legend: { display: masterLabelPos === 'inside', position: 'bottom', labels: { color: textColor } }, datalabels: { display: masterLabelPos === 'inside', color: '#fff', font: { weight: 'bold' }, formatter: (v, c) => c.chart.data.labels[c.dataIndex] + '\n' + ((v/grandTotal)*100).toFixed(1) + '%' } } },
+                    plugins: masterLabelPos === 'outside' ? [techLabelsPlugin] : []
+                });
+            }
+
+            // 2. 編輯內容渲染
+            if (isEditing) {
+                const tabs = document.getElementById('groupTabs');
+                tabs.innerHTML = `<button onclick="filterGroup(-1)" class="px-4 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${currentFilterGroup === -1 ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 border border-slate-700'}">全部</button>`;
+                chartConfigs.forEach((conf, i) => {
+                    const isActive = currentFilterGroup === i;
+                    tabs.innerHTML += `<div class="flex items-center gap-1 p-1 rounded-lg ${isActive ? 'bg-blue-900/40 border border-blue-500' : 'bg-slate-800 border border-slate-700'}"><button onclick="filterGroup(${i})" class="px-2 py-0.5 text-xs font-bold whitespace-nowrap ${isActive ? 'text-blue-300' : 'text-slate-400'}">${conf.title}</button><span onclick="editChartTitle(${i})" class="cursor-pointer text-[10px] opacity-40 hover:opacity-100 pr-1">✎</span></div>`;
+                });
+
+                const body = document.getElementById('mainTable'); body.innerHTML = '';
+                const filtered = currentFilterGroup === -1 ? myAssets : myAssets.filter(item => chartConfigs[currentFilterGroup].selectedIds.includes(parseInt(item.id)));
+                filtered.forEach((item) => {
+                    const originalIdx = myAssets.findIndex(a => a.id === item.id); const stockColor = getItemColor(originalIdx);
+                    let btns = ''; chartConfigs.forEach((c, ci) => { btns += `<div onclick="event.stopPropagation(); toggleToChart(${item.id}, ${ci})" style="${c.selectedIds.includes(parseInt(item.id)) ? `background:${stockColor};color:white;` : `background:var(--row-border);color:var(--text-sub);`}" class="num-dot border border-slate-700">${ci+1}</div>`; });
+                    body.innerHTML += `<div class="compact-row" data-id="${item.id}"><div class="drag-handle">☰</div><div class="w-1.5 h-7 rounded-full mr-3" style="background:${stockColor}"></div><div class="flex-1 text-sm"><span class="font-bold">${item.symbol}</span><span class="text-slate-500 text-xs ml-2">${item.shares}張</span></div><div class="flex gap-1 ml-2">${btns}</div><div class="flex gap-4 ml-4"><span onclick="editItem(${item.id})" class="text-blue-500 font-bold text-xs cursor-pointer">改</span><span onclick="deleteItem(${item.id})" class="text-slate-700 text-xs cursor-pointer">✕</span></div></div>`;
+                });
+                if (isSortMode) setTimeout(initSortable, 0);
+            }
+
+            // 3. 分組圓餅圖
+            const wrapper = document.getElementById('chartsWrapper'); wrapper.innerHTML = '';
+            chartConfigs.forEach((conf, i) => {
+                let totalCost = 0; conf.selectedIds.forEach(sid => { const a = myAssets.find(it => it.id == sid); if(a) totalCost += (a.avgPrice*a.shares*1000)-(a.divRec||0)-(a.gainRec||0); });
+                const notes = conf.selectedIds.map(sid => myAssets.find(a => a.id==sid)).filter(a=>a&&a.note).map(a=>`<div><span class="text-blue-400 font-bold">${a.symbol}</span>：${a.note}</div>`).join('');
+                wrapper.innerHTML += `<div class="chart-box" id="chart-box-${i}"><input type="text" ${isEditing ? '' : 'readonly'} onchange="chartConfigs[${i}].title=this.value;render()" value="${conf.title}" class="bg-transparent border-none font-bold text-blue-400 text-center w-full mb-1 text-lg"><div class="text-center text-slate-500 text-xs mb-2">市值：<span class="text-emerald-400 font-black text-base">${(totalCost/10000).toFixed(1)}</span> 萬</div><button onclick="toggleChartLabelPos(${i})" class="screenshot-hide absolute top-3 right-12 btn-icon rounded-full w-8 h-8 flex items-center justify-center edit-only">◐</button><button onclick="downloadChart(${i})" class="screenshot-hide absolute top-3 right-2 btn-icon rounded-full w-8 h-8 flex items-center justify-center">📷</button><button onclick="deleteChart(${i})" class="screenshot-hide absolute top-3 left-3 btn-icon rounded-full w-8 h-8 flex items-center justify-center edit-only">✕</button><div class="chart-container"><canvas id="canvas-${i}"></canvas></div><div class="note-legend">${notes || '<span class="opacity-20">無備註</span>'}</div></div>`;
+            });
+            updateCharts();
+        }
+
+        function filterGroup(i) { currentFilterGroup=i; render(); }
+        function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); currentTheme=t; localStorage.setItem('appThemeV1', t); document.getElementById('themeName').innerText=t==='dark'?'預設':(t==='ocean'?'海洋':'OLED'); render(); }
+        function cycleTheme() { const o=['dark','ocean','oled']; applyTheme(o[(o.indexOf(currentTheme)+1)%o.length]); }
+        function toggleToChart(sid, ci) { const arr=chartConfigs[ci].selectedIds; const idx=arr.indexOf(parseInt(sid)); if(idx>-1) arr.splice(idx,1); else arr.push(parseInt(sid)); render(); }
+        
+        function updateCharts() {
+            chartConfigs.forEach((conf, i) => {
+                const canvas = document.getElementById(`canvas-${i}`); if (!canvas) return;
+                const dData=[], dLabels=[], dShares=[], dColors=[], dFontSizes=[];
+                conf.selectedIds.forEach(sid => {
+                    const idx = myAssets.findIndex(a=>a.id==sid);
+                    if(idx!==-1) { const s=myAssets[idx]; dData.push(Math.max(1, (s.avgPrice*s.shares*1000)-(s.divRec||0)-(s.gainRec||0))); dLabels.push(s.symbol); dShares.push(s.shares); dColors.push(getItemColor(idx)); dFontSizes.push(s.fontSize||12); }
+                });
+                if(chartInstances[i]) chartInstances[i].destroy();
+                const pos = conf.labelPos || 'outside';
+                chartInstances[i] = new Chart(canvas.getContext('2d'), {
+                    type:'pie', data:{labels:dLabels, datasets:[{data:dData, backgroundColor:dColors, borderWidth:1, borderColor:getThemeColor('--chart-border')}]},
+                    options:{ devicePixelRatio:3, responsive:true, maintainAspectRatio:false, layout:{padding:pos==='outside'?40:20}, plugins:{ legend:{display:false}, datalabels:{ color:'#fff', display:true, anchor:pos==='outside'?'end':'center', align:pos==='outside'?'end':'center', font: (c)=>({weight:'bold', size:dFontSizes[c.dataIndex]}), formatter:(v,c)=>c.chart.data.labels[c.dataIndex]+'\n'+dShares[c.dataIndex]+'張' }}}
+                });
+            });
+        }
+
+        function saveStock() {
+            const sym = document.getElementById('symbol').value.trim(); if(!sym) return;
+            const editId = document.getElementById('editId').value;
+            const data = { id: editId?parseInt(editId):Date.now(), symbol: sym.toUpperCase(), fontSize: parseInt(document.getElementById('fontSize').value)||12, shares: parseFloat(document.getElementById('shares').value)||0, avgPrice: parseFloat(document.getElementById('avgPrice').value)||0, divRec: parseFloat(document.getElementById('divRec').value)||0, gainRec: parseFloat(document.getElementById('gainRec').value)||0, note: document.getElementById('note').value.trim() };
+            if(editId) myAssets[myAssets.findIndex(i=>i.id==editId)] = data;
+            else { myAssets.push(data); if(chartConfigs.length>0) chartConfigs[0].selectedIds.push(data.id); }
+            ["editId","symbol","shares","avgPrice","divRec","gainRec","note"].forEach(id=>document.getElementById(id).value=(id.includes('Rec')?0:""));
+            render();
+        }
+
+        function editItem(id) {
+            const item = myAssets.find(i=>i.id==id);
+            ["symbol","fontSize","shares","avgPrice","divRec","gainRec","note"].forEach(k=>document.getElementById(k).value=item[k]||(k.includes('Rec')?0:""));
+            document.getElementById('editId').value=item.id;
+            document.getElementById('inputArea').scrollIntoView({behavior:'smooth', block:'center'});
+        }
+
+        function editChartTitle(i) { const t=prompt("新名稱：", chartConfigs[i].title); if(t){chartConfigs[i].title=t; render();}}
+        function addNewChart() { const t=prompt("組別名稱："); if(t){ chartConfigs.push({id:Date.now(), title:t, selectedIds:[], labelPos:'outside'}); render(); }}
+        function deleteChart(idx) { if(confirm("刪除分組？")) { chartConfigs.splice(idx,1); render(); }}
+        function deleteItem(id) { if(confirm("刪除資產？")) { myAssets=myAssets.filter(i=>i.id!==id); render(); }}
+        function toggleMasterLabelPos() { masterLabelPos=masterLabelPos==='outside'?'inside':'outside'; render(); }
+        function toggleChartLabelPos(i) { chartConfigs[i].labelPos=chartConfigs[i].labelPos==='outside'?'inside':'outside'; render(); }
+        function downloadMasterChart() { captureAndOpenImage(document.getElementById('masterChartBox'), "資產總覽"); }
+        function downloadChart(i) { captureAndOpenImage(document.getElementById(`chart-box-${i}`), chartConfigs[i].title); }
+        function captureAndOpenImage(el, name) {
+            const loading = document.getElementById('loadingOverlay'); loading.style.display='flex'; el.classList.add('capturing');
+            setTimeout(() => {
+                html2canvas(el, { scale:4, backgroundColor:getThemeColor('--bg-card') }).then(canvas => {
+                    loading.style.display='none'; el.classList.remove('capturing');
+                    const win = window.open();
+                    win.document.write(`<body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;"><img src="${canvas.toDataURL('image/jpeg', 0.9)}" style="max-width:90%; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.5)"></body>`);
+                });
+            }, 200);
+        }
+        function copyToClipboard() { const d = btoa(encodeURIComponent(JSON.stringify({myAssets, chartConfigs}))); navigator.clipboard.writeText(d).then(()=>alert("備份成功！")); }
+        function importFromText() { const c = prompt("輸入備份代碼："); if(c){ try { const d=JSON.parse(decodeURIComponent(atob(c))); myAssets=d.myAssets; chartConfigs=d.chartConfigs; render(); }catch(e){alert("解析失敗");}}}
+
+        window.onload = () => { updateEditUI(); Chart.register(ChartDataLabels); render(); };
+    </script>
+</body>
+</html>
