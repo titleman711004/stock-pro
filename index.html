@@ -37,13 +37,12 @@
         .compact-row { background: var(--row-bg); border: 1px solid var(--row-border); margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; padding: 14px; min-height: 60px; }
         .drag-handle { cursor: move; color: #3b82f6; width: 40px; display: none; align-items: center; justify-content: center; font-size: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 12px; }
         body.is-sorting .drag-handle { display: flex; }
-        .num-dot { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid transparent; }
+        .num-dot { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
         .chart-box { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 12px; position: relative; }
         .master-chart-box { border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.15); }
         .chart-container { height: 400px; position: relative; }
         .master-container { height: 480px; position: relative; }
-        /* 備註置中強化 */
-        .note-legend { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 13px; color: var(--text-sub); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; line-height: 1.6; }
+        .note-legend { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 13px; color: var(--text-sub); line-height: 1.6; }
         .screenshot-hide { opacity: 1; transition: opacity 0.2s; }
         .capturing .screenshot-hide { opacity: 0 !important; visibility: hidden !important; }
         .edit-only { display: none; }
@@ -128,57 +127,13 @@
         function getItemColor(index) { return uniquePalette[index % uniquePalette.length]; }
         function getThemeColor(varName) { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
 
-        function toggleEditMode() {
-            isEditing = !isEditing;
-            if (!isEditing) isSortMode = false;
-            localStorage.setItem('isEditingMode', isEditing);
-            updateEditUI();
-            render();
-        }
-
-        function toggleSortMode() {
-            isSortMode = !isSortMode;
-            const btn = document.getElementById('sortToggle');
-            if (isSortMode) {
-                document.body.classList.add('is-sorting');
-                btn.innerText = "✓ 鎖定順序";
-                btn.classList.add('bg-blue-600', 'text-white');
-            } else {
-                document.body.classList.remove('is-sorting');
-                btn.innerText = "⇅ 排序模式";
-                btn.classList.remove('bg-blue-600', 'text-white');
-                if (sortable) { sortable.destroy(); sortable = null; }
-            }
-            render();
-        }
-
-        function updateEditUI() {
-            const btn = document.getElementById('editBtn');
-            if (isEditing) {
-                document.body.classList.add('is-editing');
-                btn.innerText = '✎ 編輯模式：ON';
-                btn.classList.add('text-yellow-400');
-            } else {
-                document.body.classList.remove('is-editing', 'is-sorting');
-                btn.innerText = '✎ 編輯模式：OFF';
-                btn.classList.remove('text-yellow-400');
-            }
-        }
+        function toggleEditMode() { isEditing = !isEditing; if (!isEditing) isSortMode = false; localStorage.setItem('isEditingMode', isEditing); updateEditUI(); render(); }
+        function toggleSortMode() { isSortMode = !isSortMode; const btn = document.getElementById('sortToggle'); if (isSortMode) { document.body.classList.add('is-sorting'); btn.innerText = "✓ 鎖定順序"; btn.classList.add('bg-blue-600', 'text-white'); } else { document.body.classList.remove('is-sorting'); btn.innerText = "⇅ 排序模式"; btn.classList.remove('bg-blue-600', 'text-white'); if (sortable) { sortable.destroy(); sortable = null; } } render(); }
+        function updateEditUI() { const btn = document.getElementById('editBtn'); if (isEditing) { document.body.classList.add('is-editing'); btn.innerText = '✎ 編輯模式：ON'; btn.classList.add('text-yellow-400'); } else { document.body.classList.remove('is-editing', 'is-sorting'); btn.innerText = '✎ 編輯模式：OFF'; btn.classList.remove('text-yellow-400'); } }
 
         function initSortable() {
-            const el = document.getElementById('mainTable');
-            if (!el || !isSortMode) return;
-            if (sortable) sortable.destroy();
-            sortable = Sortable.create(el, {
-                handle: '.drag-handle', animation: 200,
-                onEnd: () => {
-                    const rows = Array.from(el.querySelectorAll('.compact-row'));
-                    const newIds = rows.map(r => parseInt(r.dataset.id));
-                    myAssets = newIds.map(id => myAssets.find(a => a.id === id));
-                    localStorage.setItem('myAssetsV107', JSON.stringify(myAssets));
-                    render();
-                }
-            });
+            const el = document.getElementById('mainTable'); if (!el || !isSortMode) return; if (sortable) sortable.destroy();
+            sortable = Sortable.create(el, { handle: '.drag-handle', animation: 200, onEnd: () => { const rows = Array.from(el.querySelectorAll('.compact-row')); const newIds = rows.map(r => parseInt(r.dataset.id)); myAssets = newIds.map(id => myAssets.find(a => a.id === id)); localStorage.setItem('myAssetsV107', JSON.stringify(myAssets)); render(); } });
         }
 
         const techLabelsPlugin = {
@@ -235,7 +190,14 @@
                     options: { 
                         devicePixelRatio: 3, responsive: true, maintainAspectRatio: false, 
                         layout: { padding: (masterLabelPos === 'outside') ? { top: 60, bottom: 40, left: 60, right: 60 } : 50 },
-                        plugins: { legend: { display: masterLabelPos === 'inside', position: 'bottom', labels: { color: textColor } }, datalabels: { display: masterLabelPos === 'inside', color: '#fff', font: { weight: 'bold' }, textAlign: 'center', formatter: (v, c) => c.chart.data.labels[c.dataIndex] + '\n' + ((v/grandTotal)*100).toFixed(1) + '%' } },
+                        plugins: { 
+                            legend: { display: masterLabelPos === 'inside', position: 'bottom', labels: { color: textColor } }, 
+                            datalabels: { 
+                                display: masterLabelPos === 'inside', color: '#fff', font: { weight: 'bold' }, 
+                                textAlign: 'center', // ★ 修正：標籤文字互相置中
+                                formatter: (v, c) => c.chart.data.labels[c.dataIndex] + '\n' + ((v/grandTotal)*100).toFixed(1) + '%' 
+                            } 
+                        },
                         radius: (masterLabelPos === 'outside') ? '85%' : '100%'
                     },
                     plugins: masterLabelPos === 'outside' ? [techLabelsPlugin] : []
@@ -265,14 +227,43 @@
             const wrapper = document.getElementById('chartsWrapper'); wrapper.innerHTML = '';
             chartConfigs.forEach((conf, i) => {
                 let totalCost = 0; conf.selectedIds.forEach(sid => { const a = myAssets.find(it => it.id == sid); if(a) totalCost += (a.avgPrice*a.shares*1000)-(a.divRec||0)-(a.gainRec||0); });
-                const noteItems = conf.selectedIds.map(sid => myAssets.find(a => a.id==sid)).filter(a=>a&&a.note);
-                // 備註清單置中處理
-                const notesHtml = noteItems.map(a => `<div class="w-full text-center"><span class="text-blue-400 font-bold">${a.symbol}</span>：${a.note}</div>`).join('');
-                wrapper.innerHTML += `<div class="chart-box" id="chart-box-${i}"><input type="text" ${isEditing ? '' : 'readonly'} onchange="chartConfigs[${i}].title=this.value;render()" value="${conf.title}" class="bg-transparent border-none font-bold text-blue-400 text-center w-full mb-1 text-lg"><div class="text-center text-slate-500 text-xs mb-2">市值：<span class="text-emerald-400 font-black text-base">${(totalCost/10000).toFixed(1)}</span> 萬</div><button onclick="toggleChartLabelPos(${i})" class="screenshot-hide absolute top-3 right-12 btn-icon rounded-full w-8 h-8 flex items-center justify-center edit-only">◐</button><button onclick="downloadChart(${i})" class="screenshot-hide absolute top-3 right-2 btn-icon rounded-full w-8 h-8 flex items-center justify-center">📷</button><button onclick="deleteChart(${i})" class="screenshot-hide absolute top-3 left-3 btn-icon rounded-full w-8 h-8 flex items-center justify-center edit-only">✕</button><div class="chart-container"><canvas id="canvas-${i}"></canvas></div><div class="note-legend">${notesHtml || '<span class="opacity-20">無備註</span>'}</div></div>`;
+                
+                // ★ 修正：備註區塊由顏色圖示由上往下對齊，但整體置中
+                const notes = conf.selectedIds.map(sid => {
+                    const idx = myAssets.findIndex(a => a.id == sid);
+                    const a = myAssets[idx];
+                    if(!a || !a.note) return null;
+                    const stockColor = getItemColor(idx);
+                    return `
+                        <div class="flex items-center gap-2 mb-1">
+                            <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${stockColor}; box-shadow: 0 0 5px ${stockColor}CC;"></div>
+                            <div class="text-[12px]"><span class="text-blue-400 font-bold">${a.symbol}</span>：${a.note}</div>
+                        </div>`;
+                }).filter(h => h !== null).join('');
+
+                wrapper.innerHTML += `
+                    <div class="chart-box" id="chart-box-${i}">
+                        <input type="text" ${isEditing ? '' : 'readonly'} onchange="chartConfigs[${i}].title=this.value;render()" value="${conf.title}" class="bg-transparent border-none font-bold text-blue-400 text-center w-full mb-1 text-lg">
+                        <div class="text-center text-slate-500 text-xs mb-2">市值：<span class="text-emerald-400 font-black text-base">${(totalCost/10000).toFixed(1)}</span> 萬</div>
+                        <button onclick="toggleChartLabelPos(${i})" class="screenshot-hide absolute top-3 right-12 btn-icon rounded-full w-8 h-8 flex items-center justify-center edit-only">◐</button>
+                        <button onclick="downloadChart(${i})" class="screenshot-hide absolute top-3 right-2 btn-icon rounded-full w-8 h-8 flex items-center justify-center">📷</button>
+                        <button onclick="deleteChart(${i})" class="screenshot-hide absolute top-3 left-3 btn-icon rounded-full w-8 h-8 flex items-center justify-center edit-only">✕</button>
+                        <div class="chart-container"><canvas id="canvas-${i}"></canvas></div>
+                        <div class="note-legend flex flex-col items-center">
+                            <div class="w-fit text-left">
+                                ${notes || '<div class="opacity-20 text-center">無備註</div>'}
+                            </div>
+                        </div>
+                    </div>`;
             });
             updateCharts();
         }
 
+        function filterGroup(i) { currentFilterGroup=i; render(); }
+        function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); currentTheme=t; localStorage.setItem('appThemeV1', t); document.getElementById('themeName').innerText=t==='dark'?'預設':(t==='ocean'?'海洋':'OLED'); render(); }
+        function cycleTheme() { const o=['dark','ocean','oled']; applyTheme(o[(o.indexOf(currentTheme)+1)%o.length]); }
+        function toggleToChart(sid, ci) { const arr=chartConfigs[ci].selectedIds; const idx=arr.indexOf(parseInt(sid)); if(idx>-1) arr.splice(idx,1); else arr.push(parseInt(sid)); render(); }
+        
         function updateCharts() {
             chartConfigs.forEach((conf, i) => {
                 const canvas = document.getElementById(`canvas-${i}`); if (!canvas) return;
@@ -286,16 +277,12 @@
                 chartInstances[i] = new Chart(canvas.getContext('2d'), {
                     type:'pie', data:{labels:dLabels, datasets:[{data:dData, backgroundColor:dColors, borderWidth:1, borderColor:getThemeColor('--chart-border')}]},
                     options:{ 
-                        devicePixelRatio:3, responsive:true, maintainAspectRatio:false, 
-                        layout:{padding:pos==='outside'?40:20}, 
+                        devicePixelRatio:3, responsive:true, maintainAspectRatio:false, layout:{padding:pos==='outside'?40:20}, 
                         plugins:{ 
                             legend:{display:false}, 
                             datalabels:{ 
-                                color:'#fff', 
-                                display:true, 
-                                anchor:pos==='outside'?'end':'center', 
-                                align:pos==='outside'?'end':'center', 
-                                textAlign: 'center', // 確保編號與張數置中對齊
+                                color:'#fff', display:true, anchor:pos==='outside'?'end':'center', align:pos==='outside'?'end':'center', 
+                                textAlign: 'center', // ★ 修正：標籤文字互相置中
                                 font: (c)=>({weight:'bold', size:dFontSizes[c.dataIndex]}), 
                                 formatter:(v,c)=>c.chart.data.labels[c.dataIndex]+'\n'+dShares[c.dataIndex]+'張' 
                             } 
@@ -305,10 +292,6 @@
             });
         }
 
-        function filterGroup(i) { currentFilterGroup=i; render(); }
-        function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); currentTheme=t; localStorage.setItem('appThemeV1', t); document.getElementById('themeName').innerText=t==='dark'?'預設':(t==='ocean'?'海洋':'OLED'); render(); }
-        function cycleTheme() { const o=['dark','ocean','oled']; applyTheme(o[(o.indexOf(currentTheme)+1)%o.length]); }
-        function toggleToChart(sid, ci) { const arr=chartConfigs[ci].selectedIds; const idx=arr.indexOf(parseInt(sid)); if(idx>-1) arr.splice(idx,1); else arr.push(parseInt(sid)); render(); }
         function saveStock() {
             const sym = document.getElementById('symbol').value.trim(); if(!sym) return;
             const editId = document.getElementById('editId').value;
@@ -318,12 +301,7 @@
             ["editId","symbol","shares","avgPrice","divRec","gainRec","note"].forEach(id=>document.getElementById(id).value=(id.includes('Rec')?0:""));
             render();
         }
-        function editItem(id) {
-            const item = myAssets.find(i=>i.id==id);
-            ["symbol","fontSize","shares","avgPrice","divRec","gainRec","note"].forEach(k=>document.getElementById(k).value=item[k]||(k.includes('Rec')?0:""));
-            document.getElementById('editId').value=item.id;
-            document.getElementById('inputArea').scrollIntoView({behavior:'smooth', block:'center'});
-        }
+        function editItem(id) { const item = myAssets.find(i=>i.id==id); ["symbol","fontSize","shares","avgPrice","divRec","gainRec","note"].forEach(k=>document.getElementById(k).value=item[k]||(k.includes('Rec')?0:"")); document.getElementById('editId').value=item.id; document.getElementById('inputArea').scrollIntoView({behavior:'smooth', block:'center'}); }
         function editChartTitle(i) { const t=prompt("新名稱：", chartConfigs[i].title); if(t){chartConfigs[i].title=t; render();}}
         function addNewChart() { const t=prompt("組別名稱："); if(t){ chartConfigs.push({id:Date.now(), title:t, selectedIds:[], labelPos:'outside'}); render(); }}
         function deleteChart(idx) { if(confirm("刪除分組？")) { chartConfigs.splice(idx,1); render(); }}
@@ -343,7 +321,7 @@
             }, 200);
         }
         function copyToClipboard() { const d = btoa(encodeURIComponent(JSON.stringify({myAssets, chartConfigs}))); navigator.clipboard.writeText(d).then(()=>alert("備份成功！")); }
-        function importFromText() { const c = prompt("輸入備份代碼："); if(c){ try { const d=JSON.parse(decodeURIComponent(atob(c))); myAssets=d.myAssets; chartConfigs=d.chartConfigs; render(); }catch(e){alert("解析失敗");}}}
+        function importFromText() { const c = prompt("輸入代碼："); if(c){ try { const d=JSON.parse(decodeURIComponent(atob(c))); myAssets=d.myAssets; chartConfigs=d.chartConfigs; render(); }catch(e){alert("失敗");}}}
         window.onload = () => { updateEditUI(); Chart.register(ChartDataLabels); render(); };
     </script>
 </body>
