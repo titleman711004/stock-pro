@@ -35,20 +35,20 @@
         .input-card { background: var(--bg-card); border-radius: 12px; padding: 16px; border: 2px solid var(--border-color); margin-bottom: 20px; transition: all 0.3s; }
         .input-field { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; color: var(--input-text) !important; font-size: 16px !important; width: 100%; }
         
-        /* 列表行樣式：增加間距，優化對齊 */
-        .compact-row { background: var(--row-bg); border: 1px solid var(--row-border); margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; padding: 10px 10px; min-height: 68px; }
-        .drag-handle { cursor: move; color: #3b82f6; width: 24px; display: none; align-items: center; justify-content: center; font-size: 18px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 8px; flex-shrink: 0; }
+        /* 列表行樣式：增加左右內距 */
+        .compact-row { background: var(--row-bg); border: 1px solid var(--row-border); margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; padding: 10px 8px; min-height: 68px; }
+        .drag-handle { cursor: move; color: #3b82f6; width: 24px; display: none; align-items: center; justify-content: center; font-size: 18px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 6px; flex-shrink: 0; }
         body.is-sorting .drag-handle { display: flex; }
         
-        /* 按鈕樣式 */
-        .num-dot { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 5px; font-size: 11px; font-weight: bold; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+        /* 按鈕樣式：微縮至 22px 以節省空間 */
+        .num-dot { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 5px; font-size: 10px; font-weight: bold; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
         
         .chart-box { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 12px; position: relative; }
         .master-chart-box { border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.15); }
         .chart-container { height: 350px; position: relative; }
         .master-container { height: 450px; position: relative; }
         
-        /* 備註區塊樣式 */
+        /* 備註區塊 */
         .note-legend { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 13px; color: var(--text-sub); line-height: 1.6; }
         
         .screenshot-hide { opacity: 1; transition: opacity 0.2s; }
@@ -158,7 +158,6 @@
                         const model = datapoint; const angle = (model.startAngle + model.endAngle) / 2;
                         const isRight = angle < Math.PI / 2 || angle > Math.PI * 1.5;
                         const outerRadius = model.outerRadius; 
-                        // ★ 修正1：手機版指引線再縮短一點，避免超出畫布
                         const lineExtendLen = isMobile ? 10 : 30;
                         labels.push({ index, isRight, startX: model.x + Math.cos(angle) * outerRadius, startY: model.y + Math.sin(angle) * outerRadius, elbowX: model.x + Math.cos(angle) * (outerRadius + lineExtendLen), elbowY: model.y + Math.sin(angle) * (outerRadius + lineExtendLen), text: chart.data.labels[index], pct: ((dataset.data[index] / dataset.data.reduce((a,b)=>a+b,0)) * 100).toFixed(1) + '%', finalY: model.y + Math.sin(angle) * (outerRadius + lineExtendLen) });
                     });
@@ -200,13 +199,13 @@
                     type: 'pie', data: { labels: mLabels, datasets: [{ data: mData, backgroundColor: mColors, borderWidth: 2, borderColor: getThemeColor('--chart-border') }]},
                     options: { 
                         devicePixelRatio: 3, responsive: true, maintainAspectRatio: false, 
-                        // ★ 修正2：增加 Padding 防止文字被切掉 (手機版 60px)
-                        layout: { padding: (masterLabelPos === 'outside') ? { top: 60, bottom: 40, left: isMobile?60:80, right: isMobile?60:80 } : 50 },
+                        // ★ 修正：手機版圓餅圖半徑縮小，讓出空間給文字
+                        radius: (masterLabelPos === 'outside') ? (isMobile ? '65%' : '85%') : '100%',
+                        layout: { padding: (masterLabelPos === 'outside') ? { top: 60, bottom: 40, left: isMobile?50:80, right: isMobile?50:80 } : 50 },
                         plugins: { 
                             legend: { display: masterLabelPos === 'inside', position: 'bottom', labels: { color: textColor } }, 
                             datalabels: { display: masterLabelPos === 'inside', color: '#fff', font: { weight: 'bold' }, textAlign: 'center', formatter: (v, c) => c.chart.data.labels[c.dataIndex] + '\n' + ((v/grandTotal)*100).toFixed(1) + '%' } 
-                        },
-                        radius: (masterLabelPos === 'outside') ? '85%' : '100%'
+                        }
                     },
                     plugins: masterLabelPos === 'outside' ? [techLabelsPlugin] : []
                 });
@@ -225,29 +224,27 @@
                 
                 filtered.forEach((item) => {
                     const originalIdx = myAssets.findIndex(a => a.id === item.id); const stockColor = getItemColor(originalIdx);
+                    // ★ 修正：按鈕間距 gap-0.5
                     let btns = ''; chartConfigs.forEach((c, ci) => { btns += `<div onclick="event.stopPropagation(); toggleToChart(${item.id}, ${ci})" style="${c.selectedIds.includes(parseInt(item.id)) ? `background:${stockColor};color:white;` : `background:var(--row-border);color:var(--text-sub);`}" class="num-dot border border-slate-700 flex-shrink-0">${ci+1}</div>`; });
                     const tCost = (item.avgPrice * item.shares * 1000) - (item.divRec || 0) - (item.gainRec || 0);
                     const perCost = item.shares > 0 ? (tCost / (item.shares * 1000)).toFixed(2) : 0;
                     
-                    // ★ 修正3：列表佈局大優化
-                    // 1. 文字區塊使用 flex-1 和 min-w-0 確保可壓縮
-                    // 2. 按鈕區塊使用 gap-2 增加與文字的距離
-                    // 3. 確保所有 flex 項目都有正確的 shrink 設定
+                    // ★ 修正：左側 mr-3，文字區塊 margin 調整，按鈕區 gap-0.5
                     body.innerHTML += `
                     <div class="compact-row" data-id="${item.id}">
                         <div class="drag-handle">☰</div>
-                        <div class="w-1.5 h-10 rounded-full flex-shrink-0 mr-2" style="background:${stockColor}"></div>
+                        <div class="w-1.5 h-10 rounded-full flex-shrink-0 mr-3" style="background:${stockColor}"></div>
                         
                         <div class="flex-1 flex flex-col justify-center min-w-0 mr-1 overflow-hidden">
                             <div class="font-bold text-sm text-white truncate mb-0.5">${item.symbol}</div>
                             <div class="flex items-center text-[11px] leading-none">
-                                <span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded mr-2 flex-shrink-0 border border-slate-700 whitespace-nowrap">${item.shares} 張</span>
+                                <span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded mr-2 flex-shrink-0 border border-slate-700 whitespace-nowrap text-[10px]">${item.shares} 張</span>
                                 <span class="text-emerald-400 font-mono truncate" title="成本: ${perCost}">成本: ${perCost}</span>
                             </div>
                             ${item.note ? `<div class="text-[10px] text-yellow-500/80 mt-0.5 italic truncate">${item.note}</div>` : ''}
                         </div>
 
-                        <div class="flex gap-1 flex-shrink-0 items-center ml-2">${btns}</div>
+                        <div class="flex gap-0.5 flex-shrink-0 items-center ml-1">${btns}</div>
                         
                         <div class="flex gap-2 flex-shrink-0 ml-2 items-center">
                             <span onclick="editItem(${item.id})" class="text-blue-500 font-bold text-xs cursor-pointer p-1">改</span>
@@ -294,7 +291,7 @@
             chartConfigs.forEach((conf, i) => {
                 const canvas = document.getElementById(`canvas-${i}`); if (!canvas) return;
                 const dData=[], dLabels=[], dShares=[], dColors=[], dFontSizes=[];
-                const isMobile = window.innerWidth < 480; // 在這裡檢測
+                const isMobile = window.innerWidth < 480; 
                 conf.selectedIds.forEach(sid => {
                     const idx = myAssets.findIndex(a=>a.id==sid);
                     if(idx!==-1) { const s=myAssets[idx]; dData.push(Math.max(1, (s.avgPrice*s.shares*1000)-(s.divRec||0)-(s.gainRec||0))); dLabels.push(s.symbol); dShares.push(s.shares); dColors.push(getItemColor(idx)); dFontSizes.push(s.fontSize||12); }
@@ -305,8 +302,9 @@
                     type:'pie', data:{labels:dLabels, datasets:[{data:dData, backgroundColor:dColors, borderWidth:1, borderColor:getThemeColor('--chart-border')}]},
                     options:{ 
                         devicePixelRatio:3, responsive:true, maintainAspectRatio:false, 
-                        // ★ 修正4：個別圖表也增加 Padding
-                        layout:{padding:pos==='outside'? (isMobile ? 60 : 50) : 20}, 
+                        // ★ 修正：手機版圓餅圖半徑縮小
+                        radius: pos==='outside' ? (isMobile ? '65%' : '85%') : '100%',
+                        layout:{padding:pos==='outside'? (isMobile ? 50 : 50) : 20}, 
                         plugins:{ legend:{display:false}, datalabels:{ color:'#fff', display:true, anchor:pos==='outside'?'end':'center', align:pos==='outside'?'end':'center', textAlign: 'center', font: (c)=>({weight:'bold', size:dFontSizes[c.dataIndex]}), formatter:(v,c)=>c.chart.data.labels[c.dataIndex]+'\n'+dShares[c.dataIndex]+'張' } } 
                     }
                 });
