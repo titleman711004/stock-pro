@@ -39,6 +39,7 @@
         .drag-handle { cursor: move; color: #3b82f6; width: 24px; display: none; align-items: center; justify-content: center; font-size: 18px; background: rgba(59, 130, 246, 0.1); border-radius: 6px; margin-right: 4px; flex-shrink: 0; }
         body.is-sorting .drag-handle { display: flex; }
         
+        /* 按鈕樣式：維持 20px */
         .num-dot { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
         
         .chart-box { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 12px; position: relative; }
@@ -156,47 +157,43 @@
                         const isRight = angle < Math.PI / 2 || angle > Math.PI * 1.5;
                         const outerRadius = model.outerRadius; 
                         
-                        // ★ 關鍵修正：延長第一段引線 (Extension)
-                        // 手機版增加到 25px，電腦版 40px，讓文字遠離圓餅
-                        const lineExtendLen = isMobile ? 25 : 40;
+                        // ★ 關鍵修正：手機版使用極短的延伸線 (10px)，將文字拉近圓餅圖
+                        // 這樣即使在窄螢幕，也能利用圓餅圖與螢幕邊緣的間隙顯示文字
+                        const lineExtendLen = isMobile ? 10 : 40;
                         
                         labels.push({ index, isRight, startX: model.x + Math.cos(angle) * outerRadius, startY: model.y + Math.sin(angle) * outerRadius, elbowX: model.x + Math.cos(angle) * (outerRadius + lineExtendLen), elbowY: model.y + Math.sin(angle) * (outerRadius + lineExtendLen), text: chart.data.labels[index], pct: ((dataset.data[index] / dataset.data.reduce((a,b)=>a+b,0)) * 100).toFixed(1) + '%', finalY: model.y + Math.sin(angle) * (outerRadius + lineExtendLen) });
                     });
                 });
                 
-                // ★ 關鍵演算法：智慧分散排列 (Smart Spacing + Vertical Balancing)
+                // ★ 智慧標籤分散與垂直平衡演算法
                 ['left', 'right'].forEach(side => {
                     const sideLabels = labels.filter(l => l.isRight === (side === 'right')).sort((a, b) => a.startY - b.startY);
-                    
                     if (sideLabels.length === 0) return;
 
-                    // 1. 緊湊堆疊，避免文字重疊
-                    const minSpacing = isMobile ? 18 : 30; // 稍微增加間距
+                    // 1. 緊湊排列：確保標籤不重疊
+                    const minSpacing = isMobile ? 16 : 30; 
                     for (let i = 1; i < sideLabels.length; i++) {
                         if (sideLabels[i].finalY - sideLabels[i-1].finalY < minSpacing) {
                             sideLabels[i].finalY = sideLabels[i-1].finalY + minSpacing;
                         }
                     }
 
-                    // 2. 垂直置中平衡：將整組標籤移回中心
+                    // 2. 垂直平衡：將整組標籤移回圓餅圖的幾何中心，利用角落空間
                     const topY = sideLabels[0].finalY;
                     const bottomY = sideLabels[sideLabels.length - 1].finalY;
                     const contentHeight = bottomY - topY;
-                    
                     const anchorTop = sideLabels[0].startY;
                     const anchorBottom = sideLabels[sideLabels.length - 1].startY;
                     const anchorCenter = (anchorTop + anchorBottom) / 2;
-                    
                     const currentCenter = topY + contentHeight / 2;
                     const shift = anchorCenter - currentCenter;
-                    
                     sideLabels.forEach(l => l.finalY += shift);
                 });
 
-                // 繪製連線與文字
+                // 繪製線條
                 labels.forEach(l => {
-                    // ★ 關鍵修正：延長第二段水平轉折 (Bend)
-                    const lineBendLen = isMobile ? 20 : 40; 
+                    // ★ 關鍵修正：手機版轉折線也縮短 (10px)
+                    const lineBendLen = isMobile ? 10 : 40; 
                     const endX = l.elbowX + (l.isRight ? lineBendLen : -lineBendLen);
                     
                     ctx.save(); ctx.beginPath(); ctx.moveTo(l.startX, l.startY); ctx.lineTo(l.elbowX, l.elbowY); ctx.lineTo(l.elbowX, l.finalY); ctx.lineTo(endX, l.finalY);
@@ -228,7 +225,7 @@
                     type: 'pie', data: { labels: mLabels, datasets: [{ data: mData, backgroundColor: mColors, borderWidth: 2, borderColor: getThemeColor('--chart-border') }]},
                     options: { 
                         devicePixelRatio: 3, responsive: true, maintainAspectRatio: false, 
-                        // ★ 恢復大尺寸：手機版與電腦版皆為 85%
+                        // ★ 保持 85% 大半徑，不縮小
                         radius: (masterLabelPos === 'outside') ? '85%' : '100%',
                         layout: { padding: (masterLabelPos === 'outside') ? { top: 50, bottom: 50, left: isMobile?50:80, right: isMobile?50:80 } : 50 },
                         plugins: { 
@@ -253,7 +250,6 @@
                 
                 filtered.forEach((item) => {
                     const originalIdx = myAssets.findIndex(a => a.id === item.id); const stockColor = getItemColor(originalIdx);
-                    // 按鈕間距 gap-[1px]
                     let btns = ''; chartConfigs.forEach((c, ci) => { btns += `<div onclick="event.stopPropagation(); toggleToChart(${item.id}, ${ci})" style="${c.selectedIds.includes(parseInt(item.id)) ? `background:${stockColor};color:white;` : `background:var(--row-border);color:var(--text-sub);`}" class="num-dot border border-slate-700 flex-shrink-0">${ci+1}</div>`; });
                     const tCost = (item.avgPrice * item.shares * 1000) - (item.divRec || 0) - (item.gainRec || 0);
                     const perCost = item.shares > 0 ? (tCost / (item.shares * 1000)).toFixed(2) : 0;
@@ -308,35 +304,6 @@
                     </div>`;
             });
             updateCharts();
-        }
-
-        function filterGroup(i) { currentFilterGroup=i; render(); }
-        function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); currentTheme=t; localStorage.setItem('appThemeV1', t); document.getElementById('themeName').innerText=t==='dark'?'預設':(t==='ocean'?'海洋':'OLED'); render(); }
-        function cycleTheme() { const o=['dark','ocean','oled']; applyTheme(o[(o.indexOf(currentTheme)+1)%o.length]); }
-        function toggleToChart(sid, ci) { const arr=chartConfigs[ci].selectedIds; const idx=arr.indexOf(parseInt(sid)); if(idx>-1) arr.splice(idx,1); else arr.push(parseInt(sid)); render(); }
-        
-        function updateCharts() {
-            chartConfigs.forEach((conf, i) => {
-                const canvas = document.getElementById(`canvas-${i}`); if (!canvas) return;
-                const dData=[], dLabels=[], dShares=[], dColors=[], dFontSizes=[];
-                const isMobile = window.innerWidth < 480; 
-                conf.selectedIds.forEach(sid => {
-                    const idx = myAssets.findIndex(a=>a.id==sid);
-                    if(idx!==-1) { const s=myAssets[idx]; dData.push(Math.max(1, (s.avgPrice*s.shares*1000)-(s.divRec||0)-(s.gainRec||0))); dLabels.push(s.symbol); dShares.push(s.shares); dColors.push(getItemColor(idx)); dFontSizes.push(s.fontSize||12); }
-                });
-                if(chartInstances[i]) chartInstances[i].destroy();
-                const pos = conf.labelPos || 'outside';
-                chartInstances[i] = new Chart(canvas.getContext('2d'), {
-                    type:'pie', data:{labels:dLabels, datasets:[{data:dData, backgroundColor:dColors, borderWidth:1, borderColor:getThemeColor('--chart-border')}]},
-                    options:{ 
-                        devicePixelRatio:3, responsive:true, maintainAspectRatio:false, 
-                        // ★ 恢復大尺寸：85%
-                        radius: pos==='outside' ? '85%' : '100%',
-                        layout:{padding:pos==='outside'? (isMobile ? 50 : 50) : 20}, 
-                        plugins:{ legend:{display:false}, datalabels:{ color:'#fff', display:true, anchor:pos==='outside'?'end':'center', align:pos==='outside'?'end':'center', textAlign: 'center', font: (c)=>({weight:'bold', size:dFontSizes[c.dataIndex]}), formatter:(v,c)=>c.chart.data.labels[c.dataIndex]+'\n'+dShares[c.dataIndex]+'張' } } 
-                    }
-                });
-            });
         }
 
         function saveStock() {
